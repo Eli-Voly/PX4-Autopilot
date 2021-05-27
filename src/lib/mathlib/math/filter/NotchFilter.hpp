@@ -57,7 +57,7 @@ public:
 	NotchFilter() = default;
 	~NotchFilter() = default;
 
-	void setParameters(float sample_freq, float notch_freq, float bandwidth);
+	void setParameters(float sample_freq, float notch_freq, float bandwidth, bool force = false);
 
 	/**
 	 * Add a new raw value to the filter using the Direct Form I
@@ -66,6 +66,11 @@ public:
 	 */
 	inline T apply(const T &sample)
 	{
+		// shift current notch frequency if necessary
+		if (fabsf(_notch_freq - _notch_freq_desired) > FLT_EPSILON) {
+			setParameters(_sample_freq, _notch_freq_desired, _bandwidth);
+		}
+
 		// Direct Form I implementation
 		T output = _b0 * sample + _b1 * _delay_element_1 + _b2 * _delay_element_2 - _a1 * _delay_element_output_1 - _a2 *
 			   _delay_element_output_2;
@@ -89,8 +94,9 @@ public:
 		}
 	}
 
-	float getNotchFreq() const { return _notch_freq; }
+	float getNotchFreq() const { return _notch_freq_desired; }
 	float getBandwidth() const { return _bandwidth; }
+	float getSampleFreq() const { return _sample_freq; }
 
 	// Used in unit test only
 	void getCoefficients(float a[3], float b[3]) const
@@ -132,6 +138,11 @@ public:
 
 	void reset(const T &sample)
 	{
+		// fully update notch frequency to desired if necessary
+		if (fabsf(_notch_freq - _notch_freq_desired) > FLT_EPSILON) {
+			setParameters(_sample_freq, _notch_freq_desired, _bandwidth, true);
+		}
+
 		const T input = isFinite(sample) ? sample : T{};
 
 		_delay_element_1 = _delay_element_2 = input;
@@ -146,6 +157,7 @@ public:
 	{
 		// no filtering
 		_notch_freq = 0.f;
+		_notch_freq_desired = 0.f;
 		_bandwidth = 0.f;
 		_sample_freq = 0.f;
 
@@ -177,6 +189,7 @@ protected:
 	float _b2{0.f};
 
 	float _notch_freq{};
+	float _notch_freq_desired{};
 	float _bandwidth{};
 	float _sample_freq{};
 };
@@ -188,7 +201,7 @@ protected:
  * conserving the filter's history
  */
 template<typename T>
-void NotchFilter<T>::setParameters(float sample_freq, float notch_freq, float bandwidth)
+void NotchFilter<T>::setParameters(float sample_freq, float notch_freq, float bandwidth, bool force)
 {
 	if ((sample_freq <= 0.f) || (notch_freq <= 0.f) || (bandwidth <= 0.f) || (notch_freq >= sample_freq / 2)
 	    || !isFinite(sample_freq) || !isFinite(notch_freq) || !isFinite(bandwidth)) {
@@ -197,12 +210,27 @@ void NotchFilter<T>::setParameters(float sample_freq, float notch_freq, float ba
 		return;
 	}
 
-	_notch_freq = math::constrain(notch_freq, 5.f, sample_freq / 2); // TODO: min based on actual numerical limit
-	_bandwidth = math::constrain(bandwidth, 5.f, sample_freq / 2);
-	_sample_freq = sample_freq;
+	const float MIN_FREQ_HZ = 5.f; // TODO: min based on actual numerical limit
+	const float MAX_FREQ_HZ = sample_freq / 2;
 
-	const float alpha = tanf(M_PI_F * bandwidth / sample_freq);
-	const float beta = -cosf(2.f * M_PI_F * notch_freq / sample_freq);
+	_notch_freq_desired = math::constrain(notch_freq, MIN_FREQ_HZ, MAX_FREQ_HZ);
+
+	if (!force && (_notch_freq > 0.f)
+	    && (fabsf(sample_freq - _sample_freq) <= FLT_EPSILON)
+	    && (fabsf(bandwidth - _bandwidth) <= FLT_EPSILON)) {
+
+		// only changing notch frequency, update gradually
+		const float delta = _bandwidth / 2; // TODO: determine numerically safe gradual change
+		_notch_freq = math::constrain(_notch_freq_desired, _notch_freq - delta, _notch_freq + delta);
+
+	} else {
+		_notch_freq = _notch_freq_desired;
+		_bandwidth = math::max(bandwidth, MIN_FREQ_HZ);
+		_sample_freq = sample_freq;
+	}
+
+	const float alpha = tanf(M_PI_F * _bandwidth / _sample_freq);
+	const float beta = -cosf(2.f * M_PI_F * _notch_freq / _sample_freq);
 	const float a0_inv = 1.f / (alpha + 1.f);
 
 	_b0 = a0_inv;

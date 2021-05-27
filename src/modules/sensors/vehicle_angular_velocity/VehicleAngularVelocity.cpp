@@ -434,7 +434,7 @@ void VehicleAngularVelocity::UpdateDynamicNotchEscRpm(bool force)
 
 		if (_esc_status_sub.copy(&esc_status) && (hrt_elapsed_time(&esc_status.timestamp) < DYNAMIC_NOTCH_FITLER_TIMEOUT)) {
 
-			static constexpr int32_t ESC_RPM_MIN = 10 * 60; // TODO: configurable
+			static constexpr int32_t ESC_RPM_MIN = 20 * 60; // TODO: configurable
 			const int32_t ESC_RPM_MAX = roundf(_filter_sample_rate_hz / 3.f * 60.f); // upper bound safety (well below Nyquist)
 
 			for (size_t esc = 0; esc < math::min(esc_status.esc_count, (uint8_t)MAX_NUM_ESC_RPM); esc++) {
@@ -447,25 +447,20 @@ void VehicleAngularVelocity::UpdateDynamicNotchEscRpm(bool force)
 
 					// for each ESC check determine if enabled/disabled from first notch (x axis, harmonic 0)
 					auto &nfx0 = _dynamic_notch_filter_esc_rpm[0][esc][0];
-
 					bool reset = (nfx0.getNotchFreq() <= FLT_EPSILON); // notch was previously disabled
 
 					const float esc_hz = static_cast<float>(esc_report.esc_rpm) / 60.f;
 
 					// update filter parameters if frequency changed or forced
 					if (force || reset || (fabsf(nfx0.getNotchFreq() - esc_hz) > FLT_EPSILON)) {
-						static constexpr float ESC_NOTCH_BW_HZ = 5.f; // TODO: configurable bandwidth
-
-						// force reset if the notch frequency jumps significantly
-						if (!reset || (fabsf(nfx0.getNotchFreq() - esc_hz) > ESC_NOTCH_BW_HZ)) {
-							reset = true;
-						}
+						static constexpr float ESC_NOTCH_BW_HZ = 8.f; // TODO: configurable bandwidth
 
 						for (int harmonic = MAX_NUM_ESC_RPM_HARMONICS; harmonic >= 0; harmonic--) {
-							const float frequency_hz = esc_hz * (harmonic + 1);
+							const float notch_freq_hz = esc_hz * (harmonic + 1);
 
 							for (int axis = 0; axis < 3; axis++) {
-								_dynamic_notch_filter_esc_rpm[axis][esc][harmonic].setParameters(_filter_sample_rate_hz, frequency_hz, ESC_NOTCH_BW_HZ);
+								_dynamic_notch_filter_esc_rpm[axis][esc][harmonic].setParameters(_filter_sample_rate_hz, notch_freq_hz,
+										ESC_NOTCH_BW_HZ);
 							}
 						}
 
@@ -529,8 +524,6 @@ void VehicleAngularVelocity::UpdateDynamicNotchFFT(bool force)
 			const float peak_freq_min = _param_imu_gyro_cutoff.get() / 2.f;
 			const float peak_freq_max = _filter_sample_rate_hz / 3.f; // upper bound safety (well below Nyquist)
 
-			const float bandwidth = math::constrain(sensor_gyro_fft.resolution_hz, 5.f, 30.f); // TODO: base on numerical limits?
-
 			float *peak_frequencies[] {sensor_gyro_fft.peak_frequencies_x, sensor_gyro_fft.peak_frequencies_y, sensor_gyro_fft.peak_frequencies_z};
 
 			for (int axis = 0; axis < 3; axis++) {
@@ -542,14 +535,10 @@ void VehicleAngularVelocity::UpdateDynamicNotchFFT(bool force)
 					const float peak_freq = peak_frequencies[axis][peak];
 
 					if (PX4_ISFINITE(peak_freq) && (peak_freq > peak_freq_min) && (peak_freq < peak_freq_max)) {
-						// force reset if the notch frequency jumps significantly
-						if (fabsf(nf.getNotchFreq() - peak_freq) > bandwidth) {
-							reset = true;
-						}
 
 						// update filter parameters if frequency changed or forced
 						if (force || (fabsf(nf.getNotchFreq() - peak_freq) > FLT_EPSILON)) {
-							nf.setParameters(_filter_sample_rate_hz, peak_freq, bandwidth);
+							nf.setParameters(_filter_sample_rate_hz, peak_freq, sensor_gyro_fft.resolution_hz);
 							perf_count(_dynamic_notch_filter_fft_update_perf);
 						}
 
