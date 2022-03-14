@@ -57,6 +57,7 @@ TattuCan::~TattuCan()
 {
 }
 
+
 void TattuCan::Run()
 {
 	if (should_exit()) {
@@ -66,7 +67,23 @@ void TattuCan::Run()
 
 	if (!_initialized) {
 
-		_fd = ::open("/dev/can0", O_RDWR);
+		struct can_dev_s *can = stm32_caninitialize(1);
+
+		if (can == nullptr) {
+			PX4_ERR("Failed to get CAN interface");
+
+		} else {
+			/* Register the CAN driver at "/dev/can0" */
+			int ret = can_register("/dev/can0", can);
+
+			if (ret < 0) {
+				PX4_ERR("can_register failed: %d", ret);
+
+			} else {
+				_fd = ::open("/dev/can0", O_RDWR);
+
+			}
+		}
 
 		if (_fd < 0) {
 			PX4_INFO("FAILED TO OPEN /dev/can0");
@@ -108,7 +125,7 @@ void TattuCan::Run()
 		battery_status.connected = true;
 		battery_status.cell_count = 12;
 
-		sprintf(battery_status.serial_number, "%d", tattu_message.manufacturer);
+		battery_status.serial_number = tattu_message.manufacturer;
 		battery_status.id = static_cast<uint8_t>(tattu_message.sku);
 
 		battery_status.cycle_count = tattu_message.cycle_life;
@@ -156,6 +173,7 @@ int16_t TattuCan::receive(CanFrame *received_frame)
 
 	// Only execute this part if can0 is changed.
 	if (fds.revents & POLLIN) {
+	PX4_INFO("here2");
 
 		// Try to read.
 		struct can_msg_s receive_msg;

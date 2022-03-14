@@ -8,6 +8,7 @@ px4_add_board(
 	ARCHITECTURE cortex-m7
 	ROMFSROOT px4fmu_common
 	UAVCAN_INTERFACES 1
+	CAN_INTERFACES 1
 	SERIAL_PORTS
 		GPS1:/dev/ttyS0 # UART1  / J10
 		TEL1:/dev/ttyS6 # UART7  / J5
@@ -48,7 +49,8 @@ px4_add_board(
 		safety_button
 		telemetry # all available telemetry drivers
 		#tone_alarm
-		uavcan
+		#uavcan
+		tattu_can
 	MODULES
 		airspeed_selector
 		attitude_estimator_q

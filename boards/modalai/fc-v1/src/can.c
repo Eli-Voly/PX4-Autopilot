@@ -65,7 +65,7 @@
 #ifdef CONFIG_STM32F7_CAN1
 #  define CAN_PORT 1
 #else
-#  define CAN_PORT 2
+#  define CAN_PORT 1
 #endif
 
 /************************************************************************************

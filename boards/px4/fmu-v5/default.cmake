@@ -54,7 +54,7 @@ px4_add_board(
 		safety_button
 		telemetry # all available telemetry drivers
 		tone_alarm
-		uavcan
+		#uavcan
 		tattu_can
 	MODULES
 		airspeed_selector
