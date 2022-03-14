@@ -67,23 +67,7 @@ void TattuCan::Run()
 
 	if (!_initialized) {
 
-		struct can_dev_s *can = stm32_caninitialize(1);
-
-		if (can == nullptr) {
-			PX4_ERR("Failed to get CAN interface");
-
-		} else {
-			/* Register the CAN driver at "/dev/can0" */
-			int ret = can_register("/dev/can0", can);
-
-			if (ret < 0) {
-				PX4_ERR("can_register failed: %d", ret);
-
-			} else {
-				_fd = ::open("/dev/can0", O_RDWR);
-
-			}
-		}
+		_fd = ::open("/dev/can0", O_RDWR);
 
 		if (_fd < 0) {
 			PX4_INFO("FAILED TO OPEN /dev/can0");

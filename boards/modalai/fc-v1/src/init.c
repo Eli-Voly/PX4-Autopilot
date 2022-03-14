@@ -75,6 +75,8 @@
 #include <px4_platform/gpio.h>
 #include <px4_platform/board_dma_alloc.h>
 
+extern void can_devinit(void);
+
 /****************************************************************************
  * Pre-Processor Definitions
  ****************************************************************************/
@@ -297,6 +299,8 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	/* Configure the HW based on the manifest */
 
 	px4_platform_configure();
+
+    can_devinit();
 
 	return OK;
 }

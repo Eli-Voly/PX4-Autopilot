@@ -7,7 +7,7 @@ px4_add_board(
 	TOOLCHAIN arm-none-eabi
 	ARCHITECTURE cortex-m7
 	ROMFSROOT px4fmu_common
-	UAVCAN_INTERFACES 1
+	#UAVCAN_INTERFACES 1
 	CAN_INTERFACES 1
 	SERIAL_PORTS
 		GPS1:/dev/ttyS0 # UART1  / J10
@@ -33,7 +33,7 @@ px4_add_board(
 		lights # all available light drivers
 		magnetometer # all available magnetometer drivers
 		optical_flow # all available optical flow drivers
-		osd
+		#osd
 		pca9685
 		pca9685_pwm_out
 		power_monitor/ina226
